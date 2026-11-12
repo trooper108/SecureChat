@@ -6,7 +6,7 @@ dotenv.config({ quiet: true });
 
 export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  PORT: z.coerce.number().int().positive().default(3000),
+  PORT: z.coerce.number().int().min(0).default(3000),
   JWT_ACCESS_SECRET: z.string().min(1, 'JWT_ACCESS_SECRET is required'),
   MONGODB_URI: z.string().min(1, 'MONGODB_URI is required'),
   REDIS_URL: z.string().min(1, 'REDIS_URL is required'),
