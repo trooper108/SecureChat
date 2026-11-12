@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import 'fake-indexeddb/auto';
 import {
   generateIdentityKeyPair,
@@ -10,7 +10,6 @@ import {
 } from '../src/crypto/e2ee';
 import {
   getStoredIdentity,
-  saveIdentity,
   getOrCreateIdentity
 } from '../src/crypto/keyStore';
 
