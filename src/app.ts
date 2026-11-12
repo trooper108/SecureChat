@@ -3,6 +3,7 @@ import helmet from 'helmet';
 import cors from 'cors';
 import { getEnv } from './config/env';
 import { healthRouter } from './routes/health.routes';
+import { keysRouter } from './routes/keys.routes';
 
 export function createApp(): Application {
   const env = getEnv();
@@ -17,8 +18,9 @@ export function createApp(): Application {
   );
   app.use(express.json({ limit: '1mb' }));
 
-  // Mount health check route
+  // Mount routes
   app.use(healthRouter);
+  app.use(keysRouter);
 
   return app;
 }
