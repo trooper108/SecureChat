@@ -4,6 +4,7 @@ import cors from 'cors';
 import { getEnv } from './config/env';
 import { healthRouter } from './routes/health.routes';
 import { keysRouter } from './routes/keys.routes';
+import { messagesRouter } from './routes/messages.routes';
 
 export function createApp(): Application {
   const env = getEnv();
@@ -21,6 +22,7 @@ export function createApp(): Application {
   // Mount routes
   app.use(healthRouter);
   app.use(keysRouter);
+  app.use(messagesRouter);
 
   return app;
 }
