@@ -16,10 +16,12 @@ describe('Real-time Socket.io Chat, Presence, Rate Limiting & Offline Delivery',
   const userAlice = 'user_alice_socket';
   const userBob = 'user_bob_socket';
   const userCharlie = 'user_charlie_socket';
+  const userPresence = 'user_presence_socket';
 
   const aliceToken = jwt.sign({ sub: userAlice }, env.JWT_ACCESS_SECRET, { algorithm: 'HS256' });
   const bobToken = jwt.sign({ sub: userBob }, env.JWT_ACCESS_SECRET, { algorithm: 'HS256' });
   const charlieToken = jwt.sign({ sub: userCharlie }, env.JWT_ACCESS_SECRET, { algorithm: 'HS256' });
+  const presenceToken = jwt.sign({ sub: userPresence }, env.JWT_ACCESS_SECRET, { algorithm: 'HS256' });
 
   function createClient(token?: string): ClientSocketType {
     return ClientSocket(`http://127.0.0.1:${serverPort}`, {
@@ -84,22 +86,30 @@ describe('Real-time Socket.io Chat, Presence, Rate Limiting & Offline Delivery',
 
   describe('Presence Tracking in Redis', () => {
     it('should store user presence online when connected and offline when disconnected', (done) => {
-      const client = createClient(aliceToken);
+      const client = createClient(presenceToken);
       client.connect();
 
       client.on('connect', async () => {
-        // Alice should be marked online in Redis
-        const isOnline = await presenceService.isUserOnline(userAlice);
-        expect(isOnline).toBe(true);
+        try {
+          const isOnline = await presenceService.isUserOnline(userPresence);
+          expect(isOnline).toBe(true);
+        } catch (err) {
+          client.disconnect();
+          return done(err);
+        }
 
         client.disconnect();
 
-        // Brief delay for disconnect event processing
+        // Allow time for server-side disconnect event processing
         setTimeout(async () => {
-          const isStillOnline = await presenceService.isUserOnline(userAlice);
-          expect(isStillOnline).toBe(false);
-          done();
-        }, 100);
+          try {
+            const isStillOnline = await presenceService.isUserOnline(userPresence);
+            expect(isStillOnline).toBe(false);
+            done();
+          } catch (err) {
+            done(err);
+          }
+        }, 300);
       });
     });
   });

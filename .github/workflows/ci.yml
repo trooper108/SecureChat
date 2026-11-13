@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    name: Lint, Build, Test & Docker Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      # Backend checks
+      - name: Install backend dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Build backend (TypeScript)
+        run: npm run build
+
+      - name: Run backend tests
+        run: npm test
+        env:
+          NODE_ENV: test
+          JWT_ACCESS_SECRET: dummy-test-secret-at-least-32-chars-long
+          MONGODB_URI: mongodb://localhost:27017/test
+          REDIS_URL: redis://localhost:6379
+
+      # Frontend client checks
+      - name: Install and test frontend client
+        run: |
+          cd client
+          npm ci
+          npm test
+          npm run build
+
+      # Docker build (push: false)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image (push: false)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: securechat:latest

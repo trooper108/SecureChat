@@ -1,5 +1,6 @@
 import { Server as HttpServer } from 'http';
 import { Server, Socket } from 'socket.io';
+import { createAdapter } from '@socket.io/redis-adapter';
 import { z } from 'zod';
 import { socketAuthMiddleware } from '../middleware/auth';
 import { presenceService } from '../services/presence.service';
@@ -7,6 +8,13 @@ import { checkMessageRateLimit } from '../services/rateLimiter';
 import { MessageModel } from '../models/message.model';
 import { logger } from '../config/logger';
 import { getEnv } from '../config/env';
+import { getRedisClient } from '../config/redis';
+
+export interface SocketServerOptions {
+  pubClient?: any;
+  subClient?: any;
+  enableRedisAdapter?: boolean;
+}
 
 const sendMessageSchema = z.object({
   to: z.string().min(1, 'Recipient ID (to) is required'),
@@ -23,10 +31,33 @@ const typingSchema = z.object({
   isTyping: z.boolean().default(true)
 });
 
-export function setupSocketServer(httpServer: HttpServer): Server {
+export function setupSocketServer(httpServer: HttpServer, options?: SocketServerOptions): Server {
   const env = getEnv();
 
+  // Configure Socket.io Redis adapter for horizontal scaling across instances
+  let adapter: any;
+  if (options?.enableRedisAdapter !== false) {
+    let pubClient = options?.pubClient;
+    let subClient = options?.subClient;
+
+    if (!pubClient || !subClient) {
+      const baseClient = getRedisClient();
+      pubClient = baseClient.duplicate();
+      subClient = baseClient.duplicate();
+
+      pubClient.on('error', (err: any) => {
+        logger.error({ err: err.message }, 'Redis adapter pubClient connection error');
+      });
+      subClient.on('error', (err: any) => {
+        logger.error({ err: err.message }, 'Redis adapter subClient connection error');
+      });
+    }
+
+    adapter = createAdapter(pubClient, subClient);
+  }
+
   const io = new Server(httpServer, {
+    adapter,
     cors: {
       origin: env.CORS_ORIGIN === '*' ? '*' : env.CORS_ORIGIN.split(','),
       credentials: true
@@ -39,7 +70,7 @@ export function setupSocketServer(httpServer: HttpServer): Server {
   io.on('connection', async (socket: Socket) => {
     const userId = socket.data.userId as string;
 
-    // Join private room dedicated to this user across all their sockets
+    // Join private room dedicated to this user across all server instances
     socket.join(`user:${userId}`);
 
     // Update presence in Redis
@@ -69,7 +100,7 @@ export function setupSocketServer(httpServer: HttpServer): Server {
           deliveredAt
         });
 
-        // Notify sender about delivery
+        // Notify sender about delivery (routed via Redis adapter across all instances)
         io.to(`user:${msg.from}`).emit('message:delivered', {
           messageId: msg._id.toString(),
           to: userId,
@@ -131,7 +162,7 @@ export function setupSocketServer(httpServer: HttpServer): Server {
             deliveredAt
           };
 
-          // Emit to recipient's user room
+          // Emit to recipient's user room across all cluster instances
           io.to(`user:${to}`).emit('message:new', messagePayload);
 
           // Emit delivery confirmation back to sender

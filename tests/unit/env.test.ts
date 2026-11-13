@@ -1,4 +1,4 @@
-import { validateEnv, envSchema } from '../../src/config/env';
+import { validateEnv } from '../../src/config/env';
 
 describe('Environment validation', () => {
   it('should validate valid environment configuration', () => {

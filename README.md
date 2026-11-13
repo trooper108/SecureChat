@@ -177,10 +177,44 @@ npm run dev
 
 ---
 
-## Docker Deployment
+## Horizontal Scaling & Architecture
 
-To launch the backend along with MongoDB and Redis:
+SecureChat supports horizontal multi-instance scaling:
+- **Socket.io Redis Adapter**: Multi-node pub/sub distribution so servers share rooms, broadcasts, and events seamlessly across instances.
+- **Nginx Reverse Proxy & Load Balancer**: Uses `ip_hash` for sticky session affinity required by WebSocket handshakes, along with HTTP/1.1 upgrade headers.
+- **Docker Compose Cluster**: Orchestrates Nginx, 3 chat server instances (`chat-server-1`, `chat-server-2`, `chat-server-3`), MongoDB, and Redis.
 
 ```bash
+# Launch load-balanced 3-node cluster
 docker compose up --build
 ```
+
+---
+
+## Load Testing with k6
+
+A k6 load testing script is provided at [`loadtest/chat.js`](file:///d:/SecureChat/loadtest/chat.js) to measure WebSocket connection success rate, message latency (p95), and message throughput.
+
+### Running the Load Test
+
+Prerequisites: Install [k6](https://k6.io/docs/get-started/installation/).
+
+```bash
+# Basic run with 50 virtual users over 30 seconds
+k6 run loadtest/chat.js
+
+# Custom configuration with environment variables
+k6 run -e TARGET_URL=ws://localhost:3000 -e VUS=100 -e DURATION=1m loadtest/chat.js
+```
+
+### Benchmark Results
+
+| Metric | Target | 20 VUs (1 Instance) | 50 VUs (3 Instances + Nginx) | 100 VUs (3 Instances + Nginx) |
+|---|---|---|---|---|
+| **Connection Success Rate** | > 99% | | | |
+| **Message Latency (p50)** | < 50ms | | | |
+| **Message Latency (p95)** | < 200ms | | | |
+| **Message Latency (p99)** | < 500ms | | | |
+| **Throughput (messages/sec)** | > 500 msg/s | | | |
+| **Total Messages Exchanged** | - | | | |
+| **Cluster Error Rate** | 0% | | | |
